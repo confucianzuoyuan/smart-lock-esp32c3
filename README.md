@@ -3217,3 +3217,7 @@ Deep-sleep 可以用于低功耗的传感器应用，或是大部分时间都不
 ## wifi休眠模式
 
 参考示例代码：`esp-idf/examples/wifi/power_save`
+
+## 蓝牙低功耗
+
+我们的蓝牙使用的本身就是低功耗模式
