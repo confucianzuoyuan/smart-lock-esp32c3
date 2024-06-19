@@ -3103,3 +3103,117 @@ void ota_task(void)
 ```sh
 python -m http.server 8070
 ```
+
+# 通过MQTT协议向IOT物联网云平台上报数据
+
+`MQTT_Driver.h`
+
+```c
+#ifndef __MOTOR_DRIVER_H_
+#define __MOTOR_DRIVER_H_
+
+#include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#define MOTOR_DRIVER_NUM_0 GPIO_NUM_4
+#define MOTOR_DRIVER_NUM_1 GPIO_NUM_5
+
+void MOTOR_Init(void);
+void MOTOR_Open_lock(void);
+
+#endif
+```
+
+`MQTT_Driver.c`
+
+```c
+#include "MQTT_Driver.h"
+
+static const char *TAG = "MQTT_EXAMPLE";
+
+static void mqtt_app_start(void)
+{
+    esp_mqtt_client_config_t mqtt_cfg = {
+        .broker.address.uri = "mqtt://39.98.123.211:1883",
+        .credentials.client_id = "n8l85e60993pphp",
+        .credentials.username = "r47feu3x",
+        .credentials.authentication.password = "111111",
+    };
+
+    esp_mqtt_client_handle_t client = esp_mqtt_client_init(&mqtt_cfg);
+    /* The last argument may be used to pass data to the event handler, in this example mqtt_event_handler */
+    esp_mqtt_client_start(client);
+
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+    esp_mqtt_client_subscribe(client, "sys/oyhju8e3h8/n8l85e60993pphp/property/set", 0);
+
+    vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+    esp_mqtt_client_publish(client, "sys/oyhju8e3h8/n8l85e60993pphp/property/set", "{\"id\":\"zuoyuan\",\"params\":{\"Clarity\":\"1\"}}", 0, 0, 0);
+}
+
+void MQTT_Init(void)
+{
+    ESP_LOGI(TAG, "[APP] Startup..");
+    ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
+    ESP_LOGI(TAG, "[APP] IDF version: %s", esp_get_idf_version());
+
+    esp_log_level_set("*", ESP_LOG_INFO);
+    esp_log_level_set("mqtt_client", ESP_LOG_VERBOSE);
+    esp_log_level_set("MQTT_EXAMPLE", ESP_LOG_VERBOSE);
+    esp_log_level_set("TRANSPORT_BASE", ESP_LOG_VERBOSE);
+    esp_log_level_set("esp-tls", ESP_LOG_VERBOSE);
+    esp_log_level_set("TRANSPORT", ESP_LOG_VERBOSE);
+    esp_log_level_set("outbox", ESP_LOG_VERBOSE);
+
+    mqtt_app_start();
+}
+```
+
+# 低功耗
+
+## ESP32低功耗模式
+
+**浅睡眠模式**
+
+Light-sleep 模式是 ESP32 预设的一种低功耗模式，其核心思想就是在休眠时关闭或门控一些功能模块来降低功耗。从纯系统方面来说，Light-sleep 模式有两种进入方式，一种是通过 API 调用进入休眠，一种是自动进入的 auto 模式。两种模式都需要配置唤醒源进行唤醒，同时在进入休眠后会门控或关闭一些模块。这里主要介绍 Auto Light-sleep 模式。
+
+Auto Light-sleep 模式是 ESP-IDF 电源管理机制和 Light-sleep 模式的结合。开启电源管理机制是其前置条件，auto 体现在系统进入空闲状态 (IDLE) 超过设定时间后，自动进入 Light-sleep。空闲状态下，应用程序释放所有电源锁，此时，DFS 将降频以减小功耗。
+
+Auto Light-sleep 依赖于电源管理机制，系统经过提前判断，发现空闲时间超过设定时间时，则直接进入休眠。该过程为自动进行。休眠时会自动关闭 RF、8 MHz 振荡器、40 MHz 高速晶振、PLL、门控数字内核时钟，暂停 CPU 工作。
+
+Auto Light-sleep 模式需配置唤醒源。该模式拥有多种唤醒源，支持相互组合，此时任何一个唤醒源都可以触发唤醒。唤醒后，会从进入休眠的位置继续执行程序。若不配置唤醒源，进入 Light-sleep 休眠后，芯片将一直处在睡眠状态，直到外部复位。具体唤醒源有 RTC 定时器、触摸传感器、外部唤醒 (ext0)、外部唤醒 (ext1)、ULP 协处理器、SDIO、GPIO、UART、Wi-Fi、BT 唤醒等。
+
+Auto Light-sleep 模式工作流程相对复杂，但是进入休眠状态是自动进行，同时需注意在进入前配置好唤醒源，防止芯片一直处在休眠状态。
+
+![](image/Low-power-auto-light-sleep-process.png)
+
+**深睡眠模式**
+
+Deep-sleep 模式是为了追求更好的功耗表现所设计，休眠时仅保留 RTC 控制器、RTC 外设（可配置）、ULP 协处理器、RTC 高速内存、RTC 低速内存，其余模块全部关闭。与 Light-sleep 类似，Deep-sleep 同样通过 API 进入，且需要配置唤醒源进行唤醒。
+
+Deep-sleep 通过调用 API 进入，休眠时会关闭除 RTC 控制器、RTC 外设、ULP 协处理器、RTC 高速内存、RTC 低速内存外的所有模块。
+
+Deep-sleep 模式需配置唤醒源，其拥有多种唤醒源，这些唤醒源也可以组合在一起，此时任何一个唤醒源都可以触发唤醒。若不配置唤醒源进入 Deep-sleep 模式，芯片将一直处在睡眠状态，直到外部复位。具体唤醒源有 RTC 定时器、触摸传感器、外部唤醒 (ext0)、外部唤醒 (ext1)、ULP 协处理器、GPIO 唤醒等。
+
+Deep-sleep 模式工作流程如下图所示：
+
+![](image/Low-power-deep-sleep-process.png)
+
+Deep-sleep 模式主要应用场景决定了系统很长时间才会苏醒一次，完成工作后又会继续进入 Deep-sleep，所以其理想电流图如下。
+
+![](image/Low-power-deep-sleep-current.png)
+
+Deep-sleep 可以用于低功耗的传感器应用，或是大部分时间都不需要进行数据传输的情况，也就是通常所说的待机模式。设备可以每隔一段时间从 Deep-sleep 状态醒来测量数据并上传，之后重新进入 Deep-sleep；也可以将多个数据存储于 RTC memory，然后一次性发送出去。
+
+## 指纹模块休眠模式
+
+向指纹模块发送 `sleep()` 指令，可以使指纹模块进入休眠模式。
+
+当手指按上指纹模块时，会触发中断唤醒指纹模块。然后进入识别或者录入指纹的操作。
+
+## wifi休眠模式
+
+参考示例代码：`esp-idf/examples/wifi/power_save`
