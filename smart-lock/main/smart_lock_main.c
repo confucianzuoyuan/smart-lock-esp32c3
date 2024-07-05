@@ -102,7 +102,6 @@ static void enroll_fingerprint_task(void)
   {
     if (fingerprint_enroll_flag == 0xFF - 1)
     {
-      vTaskDelay(50 / portTICK_PERIOD_MS);
       AUDIO_Send(80);
       if (fingerprint_is_up)
       {
@@ -170,6 +169,7 @@ static void wifi_init_task(void)
       WIFI_Init(wifi_ssid, wifi_password);
       vTaskDelay(1000 / portTICK_PERIOD_MS);
       wifi_init_flag = 0xFF;
+      wifi_init_success_flag = 1;
     }
     vTaskDelay(100 / portTICK_PERIOD_MS);
   }

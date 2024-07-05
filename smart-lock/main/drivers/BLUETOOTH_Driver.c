@@ -15,6 +15,8 @@ extern uint8_t wifi_init_success_flag;
 extern uint8_t wifi_ssid[32];
 extern uint8_t wifi_password[64];
 
+uint8_t set_eternal_password_success = 0;
+
 #define GATTS_TAG "GATTS_DEMO"
 
 /// Declare the static function
@@ -394,8 +396,8 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
             rsp.attr_value.len = 1;
             rsp.attr_value.value[0] = 'Y';
             /// 向蓝牙调试助手发送数据
-            esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id,
-                                        ESP_GATT_OK, &rsp);
+            esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_OK, &rsp);
+            handshake_flag = 0xFF;
         }
         else if (fingerprint_enroll_success == 1)
         {
@@ -406,8 +408,8 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
             rsp.attr_value.len = 1;
             rsp.attr_value.value[0] = 'Y';
             /// 向蓝牙调试助手发送数据
-            esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id,
-                                        ESP_GATT_OK, &rsp);
+            esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_OK, &rsp);
+            fingerprint_enroll_success = 0xFF;
         }
         else if (fingerprint_enroll_success == 0)
         {
@@ -418,8 +420,32 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
             rsp.attr_value.len = 1;
             rsp.attr_value.value[0] = 'N';
             /// 向蓝牙调试助手发送数据
-            esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id,
-                                        ESP_GATT_OK, &rsp);
+            esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_OK, &rsp);
+            fingerprint_enroll_success = 0xFF;
+        }
+        else if (wifi_init_success_flag == 1)
+        {
+            ESP_LOGI(GATTS_TAG, "GATT_READ_EVT, conn_id %d, trans_id %" PRIu32 ", handle %d\n", param->read.conn_id, param->read.trans_id, param->read.handle);
+            esp_gatt_rsp_t rsp;
+            memset(&rsp, 0, sizeof(esp_gatt_rsp_t));
+            rsp.attr_value.handle = param->read.handle;
+            rsp.attr_value.len = 1;
+            rsp.attr_value.value[0] = 'Y';
+            /// 向蓝牙调试助手发送数据
+            esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_OK, &rsp);
+            wifi_init_success_flag = 0xFF;
+        }
+        else if (set_eternal_password_success == 1)
+        {
+            ESP_LOGI(GATTS_TAG, "GATT_READ_EVT, conn_id %d, trans_id %" PRIu32 ", handle %d\n", param->read.conn_id, param->read.trans_id, param->read.handle);
+            esp_gatt_rsp_t rsp;
+            memset(&rsp, 0, sizeof(esp_gatt_rsp_t));
+            rsp.attr_value.handle = param->read.handle;
+            rsp.attr_value.len = 1;
+            rsp.attr_value.value[0] = 'Y';
+            /// 向蓝牙调试助手发送数据
+            esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_OK, &rsp);
+            set_eternal_password_success = 0;
         }
         break;
     }
@@ -477,6 +503,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
                         if (err == ESP_OK)
                         {
                             printf("password set ok\r\n");
+                            set_eternal_password_success = 1;
                         }
                         else
                         {
@@ -492,7 +519,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
                     while (param->write.value[wifi_ssid_start_idx] != '+')
                     {
                         wifi_ssid[wifi_ssid_start_idx - 25] = param->write.value[wifi_ssid_start_idx];
-                        wifi_ssid_start_idx++; 
+                        wifi_ssid_start_idx++;
                     }
                     wifi_ssid[wifi_ssid_start_idx] = '\0';
                     printf("wifi_ssid from bluetooth: %s\r\n", wifi_ssid);
