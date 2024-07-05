@@ -9,6 +9,12 @@ extern uint8_t fingerprint_enroll_success;
 uint8_t received_enroll_fingerprint_request = 0;
 uint8_t handshake_flag = 0;
 
+/// wifi相关标志位
+extern uint8_t wifi_init_flag;
+extern uint8_t wifi_init_success_flag;
+extern uint8_t wifi_ssid[32];
+extern uint8_t wifi_password[64];
+
 #define GATTS_TAG "GATTS_DEMO"
 
 /// Declare the static function
@@ -446,6 +452,61 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
                 {
                     printf("接收到小程序发来的录入指纹请求\r\n");
                     fingerprint_enroll_flag = 0xFF - 1;
+                }
+                else if (memcmp(&(param->write.value[20]), "addpswd", 7) == 0)
+                {
+                    /// 定义NVS句柄
+                    nvs_handle password_nvs_handle;
+                    // 打开命名空间
+                    int err = nvs_open("password", NVS_READWRITE, &password_nvs_handle);
+                    if (err != ESP_OK)
+                    {
+                        printf("Error (%s) opening handle!\r\n", esp_err_to_name(err));
+                    }
+                    else
+                    {
+                        char pswd[7] = {0};
+                        pswd[0] = param->write.value[28];
+                        pswd[1] = param->write.value[29];
+                        pswd[2] = param->write.value[30];
+                        pswd[3] = param->write.value[31];
+                        pswd[4] = param->write.value[32];
+                        pswd[5] = param->write.value[33];
+                        pswd[6] = '\0';
+                        err = nvs_set_str(password_nvs_handle, "lock_password", pswd);
+                        if (err == ESP_OK)
+                        {
+                            printf("password set ok\r\n");
+                        }
+                        else
+                        {
+                            printf("password set failed\r\n");
+                        }
+                        err = nvs_commit(password_nvs_handle);
+                    }
+                    nvs_close(password_nvs_handle);
+                }
+                else if (memcmp(&(param->write.value[20]), "wifi", 4) == 0)
+                {
+                    int wifi_ssid_start_idx = 25;
+                    while (param->write.value[wifi_ssid_start_idx] != '+')
+                    {
+                        wifi_ssid[wifi_ssid_start_idx - 25] = param->write.value[wifi_ssid_start_idx];
+                        wifi_ssid_start_idx++; 
+                    }
+                    wifi_ssid[wifi_ssid_start_idx] = '\0';
+                    printf("wifi_ssid from bluetooth: %s\r\n", wifi_ssid);
+                    int wifi_password_start_idx = wifi_ssid_start_idx + 1;
+                    while (param->write.value[wifi_password_start_idx] != '+')
+                    {
+                        wifi_password[wifi_password_start_idx - wifi_ssid_start_idx - 1] = param->write.value[wifi_password_start_idx];
+                        wifi_password_start_idx++;
+                    }
+                    wifi_password[wifi_password_start_idx] = '\0';
+                    printf("wifi_password_from_bluetooth: %s\r\n", wifi_password);
+
+                    // 开启wifi连接任务
+                    wifi_init_flag = 1;
                 }
             }
 

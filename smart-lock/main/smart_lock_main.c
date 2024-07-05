@@ -36,6 +36,12 @@ static uint8_t fingerprint_templates_number = 0;
 static uint8_t password_array[6] = {0};
 static uint8_t password_input_count = 0;
 
+/// wifi相关标志位
+uint8_t wifi_init_flag = 0xFF;
+uint8_t wifi_ssid[32] = {0};
+uint8_t wifi_password[64] = {0};
+uint8_t wifi_init_success_flag = 0xFF;
+
 // 用来保存中断事件的队列
 static QueueHandle_t gpio_event_queue = NULL;
 
@@ -100,7 +106,8 @@ static void enroll_fingerprint_task(void)
       AUDIO_Send(80);
       if (fingerprint_is_up)
       {
-        uint8_t res = FINGERPRINT_Enroll(fingerprint_templates_number + 1, 4);
+        /// 10秒内按下两次手指
+        uint8_t res = FINGERPRINT_Enroll(fingerprint_templates_number + 1, 2);
         if (res == 0)
         {
           printf("指纹注册成功\r\n");
@@ -152,6 +159,22 @@ static void identify_fingerprint_task(void)
   }
 }
 
+// wifi启动任务
+static void wifi_init_task(void)
+{
+  while (1)
+  {
+    if (wifi_init_flag == 1)
+    {
+      printf("启动wifi");
+      WIFI_Init(wifi_ssid, wifi_password);
+      vTaskDelay(1000 / portTICK_PERIOD_MS);
+      wifi_init_flag = 0xFF;
+    }
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
+}
+
 // freertos任务：轮询gpio_event_queue队列，如果队列中有gpio引脚号，则处理
 static void process_gpio_interrupt(void *arg)
 {
@@ -180,7 +203,7 @@ static void process_gpio_interrupt(void *arg)
         }
         /// 启动OTA
         if (password_array[0] == '#' && password_array[1] == '#' &&
-                 password_array[2] == '#')
+            password_array[2] == '#')
         {
           password_input_count = 0;
           memset(password_array, 0, sizeof(password_array));
@@ -188,11 +211,38 @@ static void process_gpio_interrupt(void *arg)
         }
 
         /// 判断临时密码和永久性密码
+        char password[7] = {0};
         if (password_input_count == 6)
         {
+          /// 先判断永久性密码
+          nvs_handle password_handler;
+          int err = nvs_open("password", NVS_READWRITE, &password_handler);
+          if (err != ESP_OK)
+          {
+            printf("Error (%s) opening NVS handle!\r\n", esp_err_to_name(err));
+          }
+          else
+          {
+            printf("Done\r\n");
+            size_t len = 7;
+            err = nvs_get_str(password_handler, "lock_password", password, &len);
+            if (err == ESP_OK)
+            {
+              printf("lock password get ok: %s\r\n", password);
+            }
+            else
+            {
+              printf("lock password get error\r\n");
+            }
+            err = nvs_commit(password_handler);
+          }
+          nvs_close(password_handler);
+
           uint32_t pswd = password_array[0] * 100000 + password_array[1] * 10000 + password_array[2] * 1000 + password_array[3] * 100 + password_array[4] * 10 + password_array[5];
-          int res = validate_temppassword(pswd);
-          if (res == 1)
+
+          uint32_t eternal_pswd = (password[0] - '0') * 100000 + (password[1] - '0') * 10000 + (password[2] - '0') * 1000 + (password[3] - '0') * 100 + (password[4] - '0') * 10 + (password[5] - '0');
+
+          if (pswd == eternal_pswd)
           {
             password_input_count = 0;
             memset(password_array, 0, sizeof(password_array));
@@ -203,10 +253,24 @@ static void process_gpio_interrupt(void *arg)
           }
           else
           {
-            password_input_count = 0;
-            memset(password_array, 0, sizeof(password_array));
-            /// 播报密码验证失败语音
-            AUDIO_Send(69);
+            // 验证临时密码
+            int res = validate_temppassword(pswd);
+            if (res == 1)
+            {
+              password_input_count = 0;
+              memset(password_array, 0, sizeof(password_array));
+              /// 播报密码验证成功语音
+              AUDIO_Send(68);
+              MOTOR_Open_lock();
+              AUDIO_Send(25);
+            }
+            else
+            {
+              password_input_count = 0;
+              memset(password_array, 0, sizeof(password_array));
+              /// 播报密码验证失败语音
+              AUDIO_Send(69);
+            }
           }
         }
       }
@@ -267,13 +331,8 @@ void app_main(void)
 
   /// 蓝牙初始化
   BLUETOOTH_Init();
-  vTaskDelay(5000 / portTICK_PERIOD_MS);
-  /// WIFI初始化
-  WIFI_Init();
 
-  vTaskDelay(5000 / portTICK_PERIOD_MS);
-
-  SNTP_Init();
+  // SNTP_Init();
 
   // MQTT_Init();
 
@@ -283,6 +342,8 @@ void app_main(void)
   xTaskCreate(enroll_fingerprint_task, "enroll_fingerprint_task", 2048, NULL, 10, NULL);
   // 识别指纹的任务
   xTaskCreate(identify_fingerprint_task, "identify_fingerprint_task", 2048, NULL, 10, NULL);
+  // 注册wifi启动任务
+  xTaskCreate(wifi_init_task, "wifi_init_task", 4096, NULL, 10, NULL);
   /// 注册ota任务
   xTaskCreate(ota_task_helper, "ota_task", 8192, NULL, 10, NULL);
 }

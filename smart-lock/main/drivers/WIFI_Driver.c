@@ -1,5 +1,7 @@
 #include "WIFI_Driver.h"
 
+#include "SNTP_Driver.h"
+
 /* WiFi station Example
 
    This example code is in the Public Domain (or CC0 licensed, at your option.)
@@ -8,18 +10,6 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-#include <string.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
-#include "esp_system.h"
-#include "esp_wifi.h"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "nvs_flash.h"
-
-#include "lwip/err.h"
-#include "lwip/sys.h"
 
 /* The examples use WiFi configuration that you can set via project configuration menu
 
@@ -105,7 +95,7 @@ static void event_handler(void *arg, esp_event_base_t event_base,
     }
 }
 
-void wifi_init_sta(void)
+void wifi_init_sta(uint8_t *wifi_ssid, uint8_t *wifi_password)
 {
     /// 创建rtos的事件组
     s_wifi_event_group = xEventGroupCreate();
@@ -139,8 +129,6 @@ void wifi_init_sta(void)
 
     wifi_config_t wifi_config = {
         .sta = {
-            .ssid = EXAMPLE_ESP_WIFI_SSID, // 用户名
-            .password = EXAMPLE_ESP_WIFI_PASS, // 密码
             /* Authmode threshold resets to WPA2 as default if password matches WPA2 standards (pasword len => 8).
              * If you want to connect the device to deprecated WEP/WPA networks, Please set the threshold value
              * to WIFI_AUTH_WEP/WIFI_AUTH_WPA_PSK and set the password with length and format matching to
@@ -151,6 +139,9 @@ void wifi_init_sta(void)
             .sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
         },
     };
+    memcpy(wifi_config.sta.ssid, wifi_ssid, sizeof(wifi_config.sta.ssid));
+    memcpy(wifi_config.sta.password, wifi_password, sizeof(wifi_config.sta.password));
+
     esp_wifi_set_mode(WIFI_MODE_STA);
     esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
     /// 开始连接
@@ -173,12 +164,14 @@ void wifi_init_sta(void)
     if (bits & WIFI_CONNECTED_BIT)
     {
         ESP_LOGI(TAG, "connected to ap SSID:%s password:%s",
-                 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+                 wifi_ssid, wifi_password);
+        // 校准时钟
+        SNTP_Init();
     }
     else if (bits & WIFI_FAIL_BIT)
     {
         ESP_LOGI(TAG, "Failed to connect to SSID:%s, password:%s",
-                 EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS);
+                 wifi_ssid, wifi_password);
     }
     else
     {
@@ -186,8 +179,8 @@ void wifi_init_sta(void)
     }
 }
 
-void WIFI_Init(void)
+void WIFI_Init(uint8_t *wifi_ssid, uint8_t *wifi_password)
 {
     /// 启动wifi基站模式
-    wifi_init_sta();
+    wifi_init_sta(wifi_ssid, wifi_password);
 }
