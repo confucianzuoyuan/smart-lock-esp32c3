@@ -155,21 +155,36 @@ void FINGERPRINT_ControlLEDC(uint8_t fun, uint8_t start, uint8_t end, uint8_t cy
 /// 文档3.3.2.2 自动注册模板PS_AutoEnroll
 uint8_t *FINGERPRINT_AutoEnroll(uint16_t PageID, uint8_t entriesCount)
 {
-    uint8_t PS_AutoEnrollBuffer[17] = {0xEF, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0x08, 0x31, '\0', '\0', '\0', 0x00, 0x17, '\0', '\0'};
+    uint8_t PS_AutoEnrollBuffer[17] = {
+        0xEF, 0x01,             // 包头
+        0xFF, 0xFF, 0xFF, 0xFF, // 设备地址
+        0x01,                   // 包标识
+        0x00, 0x08,             // 包长度
+        0x31,                   // 指令码
+        '\0', '\0',             // ID号占位符
+        '\0',                   // 录入次数占位符
+        0x00, 0x17,             // 参数: 0b010111
+        '\0', '\0'              // 校验和
+    };
     // 校验和预处理
     uint8_t PS_AutoEnrollBuffer_Check = PS_AutoEnrollBuffer[6] + PS_AutoEnrollBuffer[7] + PS_AutoEnrollBuffer[8] + PS_AutoEnrollBuffer[9] +
                                         PS_AutoEnrollBuffer[12] + PS_AutoEnrollBuffer[13] + PS_AutoEnrollBuffer[14];
     static uint8_t backData[3] = {0xFF, 0xFF, 0xFF};
+    // 如果传进来的录入次数大于12，则设置为12
     uint8_t eC = entriesCount > 12 ? 12 : entriesCount;
+    /// ID号如果是0x1234 ===> [0x12, 0x34]
     PS_AutoEnrollBuffer[10] = (PageID >> 8);
     PS_AutoEnrollBuffer[11] = (PageID);
+    /// 保存录入次数
     PS_AutoEnrollBuffer[12] = (eC);
+    /// 校验和
     PS_AutoEnrollBuffer[15] = (PS_AutoEnrollBuffer_Check + PS_AutoEnrollBuffer[10] + PS_AutoEnrollBuffer[11] + PS_AutoEnrollBuffer[12]) >> 8;
     PS_AutoEnrollBuffer[16] = (PS_AutoEnrollBuffer_Check + PS_AutoEnrollBuffer[10] + PS_AutoEnrollBuffer[11] + PS_AutoEnrollBuffer[12]);
+    /// 发送数据
     uart_write_bytes(UART_NUM_1, PS_AutoEnrollBuffer, 17);
     /// 读取串口发送过来的数据
     uint8_t data[64];
-    /// 录入指纹需要等待10秒钟，10秒钟之类需要按压指纹模板entriesCount次
+    /// 录入指纹需要等待10秒钟，10秒钟之内需要按压指纹模板entriesCount次
     int len = uart_read_bytes(UART_NUM_1, data, 64 - 1, 10000 / portTICK_PERIOD_MS);
 
     if (len)
@@ -179,7 +194,7 @@ uint8_t *FINGERPRINT_AutoEnroll(uint16_t PageID, uint8_t entriesCount)
             backData[0] = data[9];
             backData[1] = data[10];
             backData[2] = data[11];
-            printf("error message: 0x%x, 0x%x, 0x%x\r\n", data[9], data[10], data[11]);
+            printf("enroll message: 0x%x, 0x%x, 0x%x\r\n", data[9], data[10], data[11]);
         }
     }
     return backData;

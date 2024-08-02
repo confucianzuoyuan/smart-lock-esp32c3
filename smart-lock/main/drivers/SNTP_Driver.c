@@ -27,6 +27,7 @@ void print_servers(void)
 
 void obtain_time(void)
 {
+    // pool.ntp.org国家授时中心
     esp_sntp_config_t config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
     esp_netif_sntp_init(&config);
 
@@ -47,6 +48,8 @@ void obtain_time(void)
     esp_netif_sntp_deinit();
 }
 
+/// @brief 和网络时钟同步
+/// @param  
 void SNTP_Init(void)
 {
     time_t now;
@@ -54,9 +57,11 @@ void SNTP_Init(void)
     time(&now);
     localtime_r(&now, &timeinfo);
     // Is time set? If not, tm_year will be (1970 - 1900).
+    // 时间同步好了吗？如果没有同步好，则从网上下载时间进行同步
     if (timeinfo.tm_year < (2016 - 1900))
     {
         ESP_LOGI(TAG, "Time is not set yet. Connecting to WiFi and getting time over NTP.");
+        /// 从网络获取时间
         obtain_time();
         // update 'now' variable with current time
         time(&now);

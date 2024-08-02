@@ -481,7 +481,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
                 }
                 else if (memcmp(&(param->write.value[20]), "addpswd", 7) == 0)
                 {
-                    /// 定义NVS句柄
+                    /// 定义NVS flash句柄
                     nvs_handle password_nvs_handle;
                     // 打开命名空间
                     int err = nvs_open("password", NVS_READWRITE, &password_nvs_handle);
@@ -492,6 +492,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
                     else
                     {
                         char pswd[7] = {0};
+                        /// 将密码存储到pswd数组中
                         pswd[0] = param->write.value[28];
                         pswd[1] = param->write.value[29];
                         pswd[2] = param->write.value[30];
@@ -499,6 +500,7 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
                         pswd[4] = param->write.value[32];
                         pswd[5] = param->write.value[33];
                         pswd[6] = '\0';
+                        /// 在flash中存储key为“lock_password”, value是密码的键值对
                         err = nvs_set_str(password_nvs_handle, "lock_password", pswd);
                         if (err == ESP_OK)
                         {
@@ -509,8 +511,10 @@ static void gatts_profile_a_event_handler(esp_gatts_cb_event_t event, esp_gatt_i
                         {
                             printf("password set failed\r\n");
                         }
+                        /// 提交保存到flash的请求
                         err = nvs_commit(password_nvs_handle);
                     }
+                    /// 关闭flash
                     nvs_close(password_nvs_handle);
                 }
                 else if (memcmp(&(param->write.value[20]), "wifi", 4) == 0)

@@ -50,7 +50,9 @@ uint8_t validate_temppassword(uint32_t input_password)
             key[j] = buff[j - 19];
         }
 
+        /// 根据"序列号+时间戳"计算出一个i32的数值
         int32_t code = hash_code(key);
+        /// 对100_0000求余，得到6位数字
         int32_t temp_password = ((code % 1000000) + 1000000) % 1000000;
 
         printf("temp_password: %ld\r\n", temp_password);
