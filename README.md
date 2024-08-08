@@ -1,5 +1,12 @@
 # ESP32简介
 
+- GPIO示例代码：`examples/peripherals/gpio/generic_gpio`
+- LED示例代码：`examples/peripherals/rmt/led_strip`
+- 串口示例代码：`examples/peripherals/uart/uart_echo`
+- 串口示例代码：`examples/peripherals/uart/uart_async_rxtxtasks`
+- 蓝牙示例代码：`examples/bluetooth/bluedroid/ble/gatt_server`
+- WIFI示例代码：`examples/wifi/getting_started`
+
 ESP32-C3 SoC 芯片支持以下功能：
 
 - 2.4 GHz Wi-Fi
@@ -10,28 +17,59 @@ ESP32-C3 SoC 芯片支持以下功能：
 
 ESP32-C3 采用 40 nm 工艺制成，具有最佳的功耗性能、射频性能、稳定性、通用性和可靠性，适用于各种应用场景和不同功耗需求。
 
-此芯片由乐鑫公司开发。
+此芯片由上海乐鑫公司开发。
 
-> 我们使用的芯片是 ESP32-C3 。
+> 我们使用的芯片是 ==ESP32-C3== 。
+
+- 51单片机：指令集是8051，8位的单片机，复杂指令集（CISC，指令不定长，汇编指令长度可能是1个字节，可能是2个字节）
+- STM32：ARM指令集
+  - STM32F103：指令集是ARM Cortex-M3，32位的指令集（RISC，精简指令集，汇编指令长度是定长的，4个字节）
+  - STM32F407：ARM Cortex-M4，比Cortex-M3多了一些例如浮点数的计算指令
+  - 苹果手机/安卓手机/高通的芯片：ARM A9指令集
+- ESP32：RISC-V指令集，32位，精简指令集
+- x86：CISC，复杂指令集
+- MIPS：精简指令集 ==> loongarch指令集
+
+STM32可以使用的实时系统：
+
+- FreeRTOS
+- uCos II/uCos III
+- ......
+
+ESP32只能使用FreeRTOS。
 
 # 安装开发工具ESP-IDF
 
+STM32的开发环境一：
+
+- Keil：包含了armcc编译器，调试器，烧写工具，链接器，汇编器
+
+STM32的开发环境二：
+
+- gcc编译器
+- gdb调试器
+- 烧写工具：openocd
+- 项目管理工具：Makefile/CMake/Ninja
+- ide：Clion/VSCode/Vim/Emacs
+
 ESP-IDF 需要安装一些必备工具，才能围绕 ESP32-C3 构建固件，包括 Python、Git、交叉编译器、CMake 和 Ninja 编译工具等。
 
-在本入门指南中，我们通过 命令行 进行有关操作。
+在本入门指南中，我们通过 ==命令行== 进行有关操作。
 
 限定条件：
 
 - 请注意 ESP-IDF 和 ESP-IDF 工具的安装路径不能超过 90 个字符，安装路径过长可能会导致构建失败。
 - Python 或 ESP-IDF 的安装路径中一定不能包含空格或括号。
 - 除非操作系统配置为支持 Unicode UTF-8，否则 Python 或 ESP-IDF 的安装路径中也不能包括特殊字符（非 ASCII 码字符）
-- 各种路径中不要有中文！
+- ==各种路径中不要有中文！==
 
 系统管理员可以通过如下方式将操作系统配置为支持 Unicode UTF-8：控制面板-更改日期、时间或数字格式-管理选项卡-更改系统地域-勾选选项 “Beta：使用 Unicode UTF-8 支持全球语言”-点击确定-重启电脑。
 
 ## 离线安装ESP-IDF
 
 点击 `https://dl.espressif.com/dl/esp-idf/?idf=4.4` 下载离线安装包。
+
+==ESP-IDF v5.3 - Offline Installer==
 
 ![](image/1.png)
 
@@ -41,9 +79,9 @@ ESP-IDF 需要安装一些必备工具，才能围绕 ESP32-C3 构建固件，�
 
 - 内置的 Python
 - 交叉编译器
-- OpenOCD
+- 烧写工具：OpenOCD
 - CMake 和 Ninja 编译工具
-- ESP-IDF
+- ESP-IDF：类似于STM32的HAL库。
 
 安装程序允许将程序下载到现有的ESP-IDF目录。
 
@@ -59,7 +97,58 @@ Run ESP-IDF PowerShell Environment：
 
 ## 创建工程
 
-现在，可以准备开发 ESP32 应用程序了。可以从 ESP-IDF 中 examples 目录下的 `get-started/hello_world` 工程开始。
+现在，可以准备开发 ESP32 应用程序了。可以从 ESP-IDF 中 `examples` 目录下的 `get-started/hello_world` 工程开始。
+
+Windows版的示例程序路径：
+
+```
+EspressIF/Frameworks/esp-idf-5.3/examples
+```
+
+常用的shell命令：
+
+```sh
+cd 文件夹 # 进入到某个文件夹，切换到某个文件夹
+cd ..    # 退回到上一级目录
+ls       # 列出当前目录中的内容
+```
+
+例如要进入到 `hello_world` 文件夹中，使用tab键补全命令
+
+```sh
+cd D:
+cd EspressIF
+cd Frameworks
+cd esp-idf-5.3
+cd examples
+...
+```
+
+编译和烧写的命令：
+
+> 注意：要使用cd命令切换到项目的文件夹中
+
+```sh
+# 芯片选型
+idf.py set-target esp32c3
+# 编译项目
+idf.py build
+# 如果电脑用户名是中文，那么编译命令是
+idf.py --no-ccache build
+# 烧写
+idf.py flash
+# 如果电脑用户名是中文，那么烧写命令是
+idf.py --no-ccache flash
+# 查看帮助
+idf.py --help
+# 烧写并打开串口助手
+idf.py flash monitor
+# 打开串口助手
+idf.py monitor
+# 退出串口助手：`Ctrl + ]`
+```
+
+flash命令是：编译+烧写
 
 > ESP-IDF 编译系统不支持 ESP-IDF 路径或其工程路径中带有空格。
 
@@ -71,6 +160,119 @@ $ xcopy /e /i %IDF_PATH%\examples\get-started\hello_world hello_world
 ```
 
 > ESP-IDF 的 examples 目录下有一系列示例工程，可以按照上述方法复制并运行其中的任何示例，也可以直接编译示例，无需进行复制。
+
+# hello_world项目讲解
+
+目录结构：
+
+```
+hello_world
+├── CMakeLists.txt
+├── main
+│   ├── CMakeLists.txt
+│   └── hello_world_main.c
+```
+
+项目根目录文件夹中的 `CMakeLists.txt` 如下：
+
+```cmake
+# 指定cmake的最低版本
+cmake_minimum_required(VERSION 3.16)
+# 在STM32开发中，需要将HAL库和FreeRTOS相关代码拷贝到项目文件夹中
+# 下面一行将esp-idf的源码中的头文件和c代码包含进来
+# `$ENV{IDF_PATH}` 是 esp-idf 的绝对路径
+# 所以不需要将esp-idf的代码拷贝到项目文件夹中
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+# 给编译好的二进制文件起一个名字，`hello_world.bin`
+project(hello_world)
+```
+
+`main` 文件夹中的 `CMakeLists.txt` 如下：
+
+```cmake
+idf_component_register(
+	# SRCS表示要包含的`.c`文件
+	SRCS "hello_world_main.c"
+	# INCLUDE_DIRS表示要包含的`.h`文件的目录
+    INCLUDE_DIRS ""
+)
+```
+
+`hello_world_main.c`
+
+```c
+#include <stdio.h>
+#include <inttypes.h>
+// esp32的配置的头文件
+#include "sdkconfig.h"
+// 实时系统的头文件
+#include "freertos/FreeRTOS.h"
+// 任务相关的头文件
+#include "freertos/task.h"
+// 芯片相关信息的头文件
+#include "esp_chip_info.h"
+// esp32自带的flash相关的头文件
+#include "esp_flash.h"
+// 系统信息头文件
+#include "esp_system.h"
+
+// main函数在esp-idf中，在编译的过程中，会将main函数自动包含进来，无需自己编写
+// esp32的入口点函数是`app_main`
+// app_main在底层是一个FreeRTOS的任务，优先级是1。
+// 作用：初始化外设，创建rtos任务。
+void app_main(void)
+{
+    // 打印到串口助手
+    printf("Hello world!\n");
+
+    /* Print chip information */
+    // 声明芯片信息结构体
+    esp_chip_info_t chip_info;
+    uint32_t flash_size;
+    // 初始化芯片信息结构体，将芯片信息填充到结构体中
+    esp_chip_info(&chip_info);
+    // 打印芯片信息
+    printf("This is %s chip with %d CPU core(s), %s%s%s%s, ",
+           CONFIG_IDF_TARGET,
+           chip_info.cores, // cpu核数
+           (chip_info.features & CHIP_FEATURE_WIFI_BGN) ? "WiFi/" : "",
+           (chip_info.features & CHIP_FEATURE_BT) ? "BT" : "",
+           (chip_info.features & CHIP_FEATURE_BLE) ? "BLE" : "",
+           (chip_info.features & CHIP_FEATURE_IEEE802154) ? ", 802.15.4 (Zigbee/Thread)" : "");
+
+    // 主设备号
+    // unsigned 是 unsigned char 的简写
+    unsigned major_rev = chip_info.revision / 100;
+    // 从设备号
+    unsigned minor_rev = chip_info.revision % 100;
+    printf("silicon revision v%d.%d, ", major_rev, minor_rev);
+    // 获取esp32自带的flash的大小
+    if(esp_flash_get_size(NULL, &flash_size) != ESP_OK) {
+        printf("Get flash size failed");
+        return;
+    }
+
+    // 打印flash大小
+    printf("%" PRIu32 "MB %s flash\n", flash_size / (uint32_t)(1024 * 1024),
+           (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+
+    // 打印最小堆的大小
+    printf("Minimum free heap size: %" PRIu32 " bytes\n", esp_get_minimum_free_heap_size());
+
+    for (int i = 10; i >= 0; i--) {
+        printf("Restarting in %d seconds...\n", i);
+        // 延时1秒钟
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+    printf("Restarting now.\n");
+    // 将缓冲区的内容刷写到标准输出
+    fflush(stdout);
+    // 重启esp32
+    esp_restart();
+}
+```
+
+
 
 ## 连接设备
 
@@ -191,8 +393,10 @@ Done
 # 电容键盘模块
 
 > 电容键盘模块的参考代码位于`examples\peripherals\gpio\generic_gpio`文件夹。
+>
+> $I^2C$的示例代码：`examples/peripherals/i2c/i2c_tools`。
 
-电容键盘使用 SC12B 。电路图如下：
+电容键盘使用 ==SC12B== 。通信协议是：$I^2C$。电路图如下：
 
 ![](image/keyboard.png)
 
@@ -259,36 +463,36 @@ idf_component_register(
 接下来，我们定义一些引脚操作的宏定义，增强代码可读性。
 
 ```c
-/// SCL时钟引脚
-#define SC12B_SCL GPIO_NUM_1
+/// SCL时钟引脚 P0
+#define I2C_SCL GPIO_NUM_1
 /// SDA数据引脚
-#define SC12B_SDA GPIO_NUM_2
+#define I2C_SDA GPIO_NUM_2
 /// INT中断引脚
-#define SC12B_INT GPIO_NUM_0
+#define KEYBOARD_INT GPIO_NUM_0
 
 /// 设置SDA引脚为输入方向
-#define I2C_SDA_IN gpio_set_direction(SC12B_SDA, GPIO_MODE_INPUT)
+#define I2C_SDA_IN gpio_set_direction(I2C_SDA, GPIO_MODE_INPUT)
 /// 设置SDA引脚为输出方向
-#define I2C_SDA_OUT gpio_set_direction(SC12B_SDA, GPIO_MODE_OUTPUT)
+#define I2C_SDA_OUT gpio_set_direction(I2C_SDA, GPIO_MODE_OUTPUT)
 
 /// 拉高SCL引脚
-#define I2C_SCL_H gpio_set_level(SC12B_SCL, 1)
+#define I2C_SCL_H gpio_set_level(I2C_SCL, 1)
 /// 拉低SCL引脚
-#define I2C_SCL_L gpio_set_level(SC12B_SCL, 0)
+#define I2C_SCL_L gpio_set_level(I2C_SCL, 0)
 
 /// 拉高SDA引脚
-#define I2C_SDA_H gpio_set_level(SC12B_SDA, 1)
+#define I2C_SDA_H gpio_set_level(I2C_SDA, 1)
 /// 拉低SDA引脚
-#define I2C_SDA_L gpio_set_level(SC12B_SDA, 0)
+#define I2C_SDA_L gpio_set_level(I2C_SDA, 0)
 
 /// 读取SDA引脚电平的值
-#define I2C_READ_SDA gpio_get_level(SC12B_SDA)
+#define I2C_READ_SDA gpio_get_level(I2C_SDA)
 ```
 
 定义一个单位为毫秒的延时函数。使用了 `vTaskDelay` 方法来实现这一点。
 
 ```c
-void Delay_ms(uint8_t time)
+void Delay_ms(uint16_t time)
 {
     vTaskDelay(time / portTICK_PERIOD_MS);
 }
@@ -539,15 +743,19 @@ void KEYBOARD_init(void)
     // 设置为输出模式
     io_conf.mode = GPIO_MODE_OUTPUT;
     // 选择要使用的引脚
+    // ULL => unsigned long long
+    // pin_bit_mask: 0b0000 => 0b0110
     io_conf.pin_bit_mask = ((1ULL << SC12B_SCL) | (1ULL << SC12B_SDA));
     // 禁用下拉
     io_conf.pull_down_en = 0;
     // 使能上拉
     io_conf.pull_up_en = 1;
-    // 是GPIO配置生效
+    // 使GPIO配置生效
     gpio_config(&io_conf);
 
     // 中断
+    // POSEDGE：上升沿，positive edge
+    // NEGEDGE：下降沿，negative edge
     io_conf.intr_type = GPIO_INTR_POSEDGE;
     io_conf.mode = GPIO_MODE_INPUT;
     io_conf.pin_bit_mask = (1ULL << SC12B_INT);
@@ -567,8 +775,10 @@ static QueueHandle_t gpio_event_queue = NULL;
 
 ```c
 /// 当回调函数执行时，参数 arg 是产生中断的 GPIO 引脚号。
+/// `IRAM_ATTR`宏定义表示回调函数在内存的某个特定位置
 static void IRAM_ATTR gpio_isr_handler(void *arg)
 {
+    /// arg中保存了触发中断的GPIO引脚号
     uint32_t gpio_num = (uint32_t)arg;
     /// 将 GPIO 引脚号添加到 gpio_event_queue 队列中。
     xQueueSendFromISR(gpio_event_queue, &gpio_num, NULL);
@@ -608,7 +818,7 @@ static void ISR_QUEUE_Init(void)
     gpio_event_queue = xQueueCreate(10, sizeof(uint32_t));
     /// 将 process_isr 注册为一个 RTOS 任务。
     xTaskCreate(process_isr, "process_isr", 2048, NULL, 10, NULL);
-    /// 监控来自 GPIO_NUM_0 的中断。
+    /// 启用中断
     gpio_install_isr_service(0);
     /// 来自 GPIO_NUM_0 也就是 SC12B_INT 的中断触发的回调函数是 gpio_isr_handler 。
     gpio_isr_handler_add(SC12B_INT, gpio_isr_handler, (void *)SC12B_INT);
@@ -634,6 +844,38 @@ idf.py flash
 ```
 
 然后就可以测试程序了。
+
+## 检测I2C设备
+
+> `esp-idf/examples/peripherals/i2c/i2c_tools`
+
+```sh
+idf.py set-target esp32c3
+idf.py menuconfig # 配置菜单
+```
+
+`Example Configuration  ---> (1) SCL GPIO Num`
+
+` Example Configuration  ---> (2) SDA GPIO Num`
+
+`Component config  ---> ESP System Settings  ---> Channel for console output (Default: UART0)  ---> USB Serial/JTAG Controller`
+
+```sh
+idf.py flash monitor
+# 输入i2cdetect
+i2c-tools> i2cdetect
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- 42 -- -- -- -- -- -- -- -- -- -- -- -- --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+```
+
+
 
 # 红外遥控（RMT）
 
@@ -680,6 +922,14 @@ RMT 接收器可以对输入信号采样，将其转换为 RMT 数据格式，�
 文件夹 `esp-idf/examples/peripherals/rmt/led_strip` 是示例代码。修改 RMT 的 GPIO 引脚就可以直接部署运行。
 
 我们的开发板的原理是 ESP32-C3 芯片使用 RMT 模块的功能通过 GPIO 引脚发送波形。而波形是经过编码的 RGB 值。
+
+RGB共需要24 bits数据表示。
+
+- R: 8 bits
+- G: 8 bits
+- B: 8 bits
+
+​	
 
 原理图如下：
 
@@ -1082,36 +1332,35 @@ idf.py flash
 
 #define AUDIO_READ_BUSY gpio_get_level(AUDIO_BUSY_PIN)
 
-void Line_1A_WT588F(uint8_t DDATA)
+void AUDIO_Play(uint8_t byte)
 {
-    uint8_t S_DATA, j;
-    uint8_t B_DATA;
-    S_DATA = DDATA;
-    AUDIO_SDA_L;
-    // 重要延时
-    DELAY_MS(10);
-    B_DATA = S_DATA & 0X01;
-    for (j = 0; j < 8; j++)
+    /// 先拉高2ms
+    gpio_set_level(AUDIO_DATA_PIN, 1);
+    DelayMs(2);
+    // 拉低10ms
+    gpio_set_level(AUDIO_DATA_PIN, 0);
+    DelayMs(10);
+    for (int i = 0; i < 8; i++)
     {
-        if (B_DATA == 1)
+        if (byte & 0b00000001)
         {
-            AUDIO_SDA_H;
-            DELAY_US(600);
-            AUDIO_SDA_L;
-            DELAY_US(200);
+            gpio_set_level(AUDIO_DATA_PIN, 1);
+            DelayUs(600);
+            gpio_set_level(AUDIO_DATA_PIN, 0);
+            DelayUs(200);
         }
         else
         {
-            AUDIO_SDA_H;
-            DELAY_US(200);
-            AUDIO_SDA_L;
-            DELAY_US(600);
+            gpio_set_level(AUDIO_DATA_PIN, 1);
+            DelayUs(200);
+            gpio_set_level(AUDIO_DATA_PIN, 0);
+            DelayUs(600);
         }
-        S_DATA = S_DATA >> 1;
-        B_DATA = S_DATA & 0X01;
+        byte >>= 1;
     }
-    AUDIO_SDA_H;
-    DELAY_MS(2);
+    // 拉高2ms
+    gpio_set_level(AUDIO_DATA_PIN, 1);
+    DelayMs(2);
 }
 
 void AUDIO_Test(void)
@@ -1202,6 +1451,8 @@ void MOTOR_Open_lock(void)
 ```
 
 # 串口通信
+
+> 示例代码位置：`examples/peripherals/uart/uart_echo`
 
 ESP32使用串口和指纹模块进行通信。电路图如下：
 
@@ -1300,12 +1551,12 @@ void app_main(void)
 #include "driver/gpio.h"
 
 /// 下面的配置可以直接写死，也可以在 menuconfig 里面配置
-#define TXD_PIN (GPIO_NUM_21)
-#define RXD_PIN (GPIO_NUM_20)
+#define UART_TX_PIN 21
+#define UART_RX_PIN 20
 
-#define BUF_SIZE (1024)
+#define BUF_SIZE 1024
 
-#define TOUCH_INT GPIO_NUM_10
+#define FINGER_TOUCH_INT 10
 
 /// 初始化指纹模块
 void FINGERPRINT_Init(void);
@@ -1340,25 +1591,25 @@ void FINGERPRINT_Init(void)
     uart_config_t uart_config = {
         .baud_rate = 57600,
         .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_1,
+        .parity = UART_PARITY_DISABLE, // 禁用奇偶校验
+        .stop_bits = UART_STOP_BITS_1, // 停止位1位
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
     int intr_alloc_flags = 0;
 
-    ESP_ERROR_CHECK(uart_driver_install(
+    uart_driver_install(
         UART_NUM_1,
         BUF_SIZE * 2, 0, 0, NULL,
-        intr_alloc_flags));
-    ESP_ERROR_CHECK(uart_param_config(
-        UART_NUM_1, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(
+        intr_alloc_flags);
+    uart_param_config(UART_NUM_1, &uart_config);
+    // 为串口1分配tx和rx引脚
+    uart_set_pin(
         UART_NUM_1,
-        TXD_PIN,
-        RXD_PIN,
+        UART_TX_PIN,
+        UART_RX_PIN,
         UART_PIN_NO_CHANGE,
-        UART_PIN_NO_CHANGE));
+        UART_PIN_NO_CHANGE);
 
     // 中断
     gpio_config_t io_conf;
@@ -1573,6 +1824,19 @@ BLE实现了一套与经典蓝牙不同的通信协议，包括低功耗的物�
 
 ## GATT SERVER 代码讲解
 
+> 运行示例代码步骤：
+>
+> ```sh
+> idf.py set-target esp32c3
+> idf.py menuconfig
+> # Component config  ---> Bluetooth  ---> Bluedroid Options
+> # [ ] Enable BLE 5.0 features
+> # [*] Enable BLE 4.2 features
+> idf.py flash monitor
+> ```
+>
+> 
+
 在本文档中，我们回顾了在ESP32上实现蓝牙低功耗（BLE）通用属性配置文件（GATT）服务器的GATT SERVER示例代码。这个示例围绕两个应用程序配置文件和一系列事件设计，这些事件被处理以执行一系列配置步骤，例如定义广告参数、更新连接参数以及创建服务和特性。此外，这个示例处理读写事件，包括一个写长特性请求，它将传入数据分割成块，以便数据能够适应属性协议（ATT）消息。本文档遵循程序工作流程，并分解代码以便理解每个部分和实现背后的原因。
 
 ### 头文件
@@ -1598,10 +1862,10 @@ BLE实现了一套与经典蓝牙不同的通信协议，包括低功耗的物�
 
 这些头文件是运行FreeRTOS和底层系统组件所必需的，包括日志功能和一个用于在非易失性闪存中存储数据的库（也就是 flash）。我们对 `esp_bt.h`、`esp_bt_main.h`、`esp_gap_ble_api.h` 和 `esp_gatts_api.h` 特别感兴趣，这些文件暴露了实现此示例所需的BLE API。
 
-- esp_bt.h：从主机侧实现蓝牙控制器和VHCI配置程序。
-- esp_bt_main.h：实现Bluedroid栈协议的初始化和启用。
-- esp_gap_ble_api.h：实现GAP配置，如广告和连接参数。
-- esp_gatts_api.h：实现GATT配置，如创建服务和特性。
+- `esp_bt.h`：从主机侧实现蓝牙控制器和VHCI配置程序。
+- `esp_bt_main.h`：实现Bluedroid栈协议的初始化和启用。
+- `esp_gap_ble_api.h`：实现GAP配置，如广告和连接参数。
+- `esp_gatts_api.h`：实现GATT配置，如创建服务和特性。
 
 > VHCI（Virtual Host Controller Interface）是一个虚拟的主机控制器接口，它通常用于软件或硬件模拟中，以模拟主机控制器的行为。在不同的上下文中，VHCI可以指代不同的技术或应用，但基本概念相似，都是提供一个虚拟的接口来模拟实际的硬件或软件行为。
 >
@@ -1620,73 +1884,36 @@ void app_main(void)
 {
     esp_err_t ret;
 
-    // Initialize NVS.
+    // 初始化flash
     ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
     {
-        ESP_ERROR_CHECK(nvs_flash_erase());
+        // 擦除flash
+        nvs_flash_erase();
+        // 再一次初始化
         ret = nvs_flash_init();
     }
-    ESP_ERROR_CHECK(ret);
-
-    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
-
+	// 释放相关内存
+    esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+	// 生成一份蓝牙控制器的默认配置
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    ret = esp_bt_controller_init(&bt_cfg);
-    if (ret)
-    {
-        ESP_LOGE(GATTS_TAG, "%s initialize controller failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
-
-    ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
-    if (ret)
-    {
-        ESP_LOGE(GATTS_TAG, "%s enable controller failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
-    ret = esp_bluedroid_init();
-    if (ret)
-    {
-        ESP_LOGE(GATTS_TAG, "%s init bluetooth failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
-    ret = esp_bluedroid_enable();
-    if (ret)
-    {
-        ESP_LOGE(GATTS_TAG, "%s enable bluetooth failed: %s\n", __func__, esp_err_to_name(ret));
-        return;
-    }
-
-    ret = esp_ble_gatts_register_callback(gatts_event_handler);
-    if (ret)
-    {
-        ESP_LOGE(GATTS_TAG, "gatts register error, error code = %x", ret);
-        return;
-    }
-    ret = esp_ble_gap_register_callback(gap_event_handler);
-    if (ret)
-    {
-        ESP_LOGE(GATTS_TAG, "gap register error, error code = %x", ret);
-        return;
-    }
-    ret = esp_ble_gatts_app_register(PROFILE_A_APP_ID);
-    if (ret)
-    {
-        ESP_LOGE(GATTS_TAG, "gatts app register error, error code = %x", ret);
-        return;
-    }
-    ret = esp_ble_gatts_app_register(PROFILE_B_APP_ID);
-    if (ret)
-    {
-        ESP_LOGE(GATTS_TAG, "gatts app register error, error code = %x", ret);
-        return;
-    }
-    esp_err_t local_mtu_ret = esp_ble_gatt_set_local_mtu(500);
-    if (local_mtu_ret)
-    {
-        ESP_LOGE(GATTS_TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
-    }
+    // 使用默认配置初始化蓝牙控制器
+    esp_bt_controller_init(&bt_cfg);
+	// 使能BLE低功耗模式
+    esp_bt_controller_enable(ESP_BT_MODE_BLE);
+    // 初始化bluedroid软件栈
+    esp_bluedroid_init();
+    // 使能bluedroid软件栈
+    esp_bluedroid_enable();
+    // 注册一个处理gatts事件的回调函数
+    esp_ble_gatts_register_callback(gatts_event_handler);
+    // 注册一个处理gap事件的回调函数
+    esp_ble_gap_register_callback(gap_event_handler);
+    // 注册一个处理`应用A`的回调函数
+    esp_ble_gatts_app_register(PROFILE_A_APP_ID);
+    // 注册一个处理`应用B`的回调函数
+    esp_ble_gatts_app_register(PROFILE_B_APP_ID);
+    esp_ble_gatt_set_local_mtu(500);
 
     return;
 }
@@ -1794,10 +2021,14 @@ struct gatts_profile_inst {
 应用程序配置文件存储在一个数组中，并分配了相应的回调函数 `gatts_profile_a_event_handler()` 和 `gatts_profile_b_event_handler()`。GATT客户端上的不同应用程序使用不同的接口，由 `gatts_if` 参数表示。对于初始化，此参数设置为 `ESP_GATT_IF_NONE`，意味着应用程序配置文件尚未链接到任何客户端。
 
 ```c
+#define PROFILE_NUM 2
+#define PROFILE_A_APP_ID 0
+#define PROFILE_B_APP_ID 1
 static struct gatts_profile_inst gl_profile_tab[PROFILE_NUM] = {
     [PROFILE_A_APP_ID] = {
         .gatts_cb = gatts_profile_a_event_handler,
         .gatts_if = ESP_GATT_IF_NONE,
+    },
     [PROFILE_B_APP_ID] = {
         .gatts_cb = gatts_profile_b_event_handler,
         .gatts_if = ESP_GATT_IF_NONE,
@@ -2041,8 +2272,10 @@ static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_
  * so here call each profile's callback */
     do {
         int idx;
+        // 遍历所有的应用：Application Profile A和Application Profile B
         for (idx = 0; idx < PROFILE_NUM; idx++) {
             if (gatts_if == ESP_GATT_IF_NONE||gatts_if == gl_profile_tab[idx].gatts_if) {
+                // 如果应用结构体的回调函数字段不为NULL,则执行回调函数
                 if (gl_profile_tab[idx].gatts_cb) {
                     gl_profile_tab[idx].gatts_cb(event, gatts_if, param);
                 }
@@ -2603,6 +2836,8 @@ prepare_write_env->prepare_len = 0;
 
 wifi模块相对蓝牙就简单很多了。
 
+> lwip: light weight internet protocol，轻量级的tcp/ip实现，一般用在嵌入式系统上。
+
 头文件如下：
 
 ```c
@@ -2646,6 +2881,7 @@ EventGroupHandle_t s_wifi_event_group;
 const char *WIFI_TAG = "wifi station";
 int s_retry_num = 0;
 
+// 处理事件的回调函数
 void event_handler(void *arg, esp_event_base_t event_base,
                           int32_t event_id, void *event_data)
 {
@@ -2663,6 +2899,7 @@ void event_handler(void *arg, esp_event_base_t event_base,
         }
         else
         {
+            // 将事件组的标志位设置为wifi连接失败
             xEventGroupSetBits(s_wifi_event_group, WIFI_FAIL_BIT);
         }
         ESP_LOGI(WIFI_TAG, "connect to the AP fail");
@@ -2672,24 +2909,29 @@ void event_handler(void *arg, esp_event_base_t event_base,
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(WIFI_TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
+        // 将事件组的标志位设置为wifi连接成功
         xEventGroupSetBits(s_wifi_event_group, WIFI_CONNECTED_BIT);
     }
 }
 
 void wifi_init_sta(void)
 {
+    // 初始化一个事件组
     s_wifi_event_group = xEventGroupCreate();
-
+	// 初始化网络
     ESP_ERROR_CHECK(esp_netif_init());
-
+	// 创建事件循环
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+    // 创建默认的基站模式
     esp_netif_create_default_wifi_sta();
-
+	// 生成默认配置
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    // 初始化wifi
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
+	// 初始化两个处理不同事件句柄实例
     esp_event_handler_instance_t instance_any_id;
     esp_event_handler_instance_t instance_got_ip;
+    // 针对不同的事件注册回调函数
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
                                                         ESP_EVENT_ANY_ID,
                                                         &event_handler,
@@ -2700,7 +2942,7 @@ void wifi_init_sta(void)
                                                         &event_handler,
                                                         NULL,
                                                         &instance_got_ip));
-
+	// 配置wifi
     wifi_config_t wifi_config = {
         .sta = {
             .ssid = EXAMPLE_ESP_WIFI_SSID,
@@ -2715,14 +2957,18 @@ void wifi_init_sta(void)
             .sae_h2e_identifier = EXAMPLE_H2E_IDENTIFIER,
         },
     };
+    // 设置为基站模式
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    // 开启wifi功能
     ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(WIFI_TAG, "wifi_init_sta finished.");
 
     /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
      * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
+    // 阻塞调用
+    // 等待事件组的标志位被设置
     EventBits_t bits = xEventGroupWaitBits(s_wifi_event_group,
                                            WIFI_CONNECTED_BIT | WIFI_FAIL_BIT,
                                            pdFALSE,
@@ -3101,7 +3347,7 @@ void ota_task(void)
 然后在 ==二进制文件所在目录== 执行以下命令：
 
 ```sh
-python -m http.server 8070
+python3 -m http.server 8070
 ```
 
 # 通过MQTT协议向IOT物联网云平台上报数据

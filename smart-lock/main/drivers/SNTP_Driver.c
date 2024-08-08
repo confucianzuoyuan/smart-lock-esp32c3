@@ -25,6 +25,7 @@ void print_servers(void)
     }
 }
 
+/// 从时钟服务器获取当前时间，更新esp32的rtc
 void obtain_time(void)
 {
     // pool.ntp.org国家授时中心
