@@ -1,0 +1,15 @@
+dependencies:
+  espressif/es8311:
+    component_hash: 46b3117250344bb03f143d5e2becf81cfb111679fbd7b95cefc2d302d36cc393
+    source:
+      service_url: https://api.components.espressif.com/
+      type: service
+    version: 1.0.0~1
+  idf:
+    component_hash: null
+    source:
+      type: idf
+    version: 5.3.0
+manifest_hash: 03539eff5373ef705152d97dc4944717c2fdbe838a30bdf38ec027968e045526
+target: esp32c3
+version: 1.0.0

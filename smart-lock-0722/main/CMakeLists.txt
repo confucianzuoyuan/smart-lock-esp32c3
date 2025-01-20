@@ -1,0 +1,18 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "./Dri/KEYBOARD_Driver.c"
+        "./Dri/MOTOR_Driver.c"
+        "./Dri/AUDIO_Driver.c"
+        "./Dri/LED_Driver.c"
+        "./Dri/FINGER_Driver.c"
+        "./Dri/BT_Driver.c"
+        "./Dri/WIFI_Driver.c"
+        "./Dri/SNTP_Driver.c"
+        "./Dri/PASSWORD_Driver.c"
+        "./Dri/OTA_Driver.c"
+        "./Dri/Utils.c"
+    INCLUDE_DIRS
+        "."
+        "./Dri"
+)

@@ -40,9 +40,13 @@ ESP32只能使用FreeRTOS。
 
 # 安装开发工具ESP-IDF
 
+> 使用的工具链：`ESP-IDF`，其中包含了编译器，汇编器，链接器，调试器，烧写器。
+> 使用的开发工具：VSCode + esp-idf插件/命令行
+
 STM32的开发环境一：
 
 - Keil：包含了armcc编译器，调试器，烧写工具，链接器，汇编器
+- 烧写的硬件工具：stlink/JLink/...
 
 STM32的开发环境二：
 
@@ -53,6 +57,13 @@ STM32的开发环境二：
 - ide：Clion/VSCode/Vim/Emacs
 
 ESP-IDF 需要安装一些必备工具，才能围绕 ESP32-C3 构建固件，包括 Python、Git、交叉编译器、CMake 和 Ninja 编译工具等。
+
+esp-idf包含：
+
+- 编译工具：将c程序编译成可以运行在esp32上面的risc-v指令集的可执行文件的gcc编译器，链接器，汇编器
+- 调试工具：gdb（gnu debugger）
+- 烧写软件：openocd
+- 项目管理工具：python/git/CMake/Makefile，项目管理工具的作用是：不需要写复杂的编译命令以及烧写命令等等，用来简化开发流程。
 
 在本入门指南中，我们通过 ==命令行== 进行有关操作。
 
@@ -71,7 +82,9 @@ ESP-IDF 需要安装一些必备工具，才能围绕 ESP32-C3 构建固件，�
 
 ==ESP-IDF v5.3 - Offline Installer==
 
-![](image/1.png)
+![A](./image/1.png)
+
+选择 ==完全安装== ！
 
 ## 安装内容
 
@@ -83,17 +96,20 @@ ESP-IDF 需要安装一些必备工具，才能围绕 ESP32-C3 构建固件，�
 - CMake 和 Ninja 编译工具
 - ESP-IDF：类似于STM32的HAL库。
 
-安装程序允许将程序下载到现有的ESP-IDF目录。
+目录说明：
 
-推荐将ESP-IDF下载到 `%userprofile%\Desktop\esp-idf`目录下，其中`%userprofile%`代表家目录。
+- `examples`文件夹中包含了esp-idf的示例程序
+- `components`文件夹中包含了开发esp32所需要的驱动api的源码
 
-## 启动ESP-IDF环境
+## 启动ESP-IDF环境的命令行工具
 
 安装结束时，如果勾选了 `Run ESP-IDF PowerShell Environment` 或 `Run ESP-IDF Command Prompt (cmd.exe)`，安装程序会在选定的提示符窗口启动 ESP-IDF。
 
 Run ESP-IDF PowerShell Environment：
 
 ![](image/esp-idf-installer-screenshot-powershell.png)
+
+双击桌面上的`esp-idf powershell`图标。
 
 ## 创建工程
 
@@ -108,9 +124,9 @@ EspressIF/Frameworks/esp-idf-5.3/examples
 常用的shell命令：
 
 ```sh
-cd 文件夹 # 进入到某个文件夹，切换到某个文件夹
-cd ..    # 退回到上一级目录
-ls       # 列出当前目录中的内容
+cd 文件夹的路径 # 进入到某个文件夹，切换到某个文件夹
+cd ..         # 退回到上一级目录
+ls            # 列出当前目录中的内容
 ```
 
 例如要进入到 `hello_world` 文件夹中，使用tab键补全命令
@@ -191,9 +207,9 @@ project(hello_world)
 
 ```cmake
 idf_component_register(
-	# SRCS表示要包含的`.c`文件
-	SRCS "hello_world_main.c"
-	# INCLUDE_DIRS表示要包含的`.h`文件的目录
+    # SRCS表示要包含的`.c`文件
+    SRCS "hello_world_main.c"
+    # INCLUDE_DIRS表示要包含的`.h`文件的目录
     INCLUDE_DIRS ""
 )
 ```
@@ -781,7 +797,9 @@ static void IRAM_ATTR gpio_isr_handler(void *arg)
     /// arg中保存了触发中断的GPIO引脚号
     uint32_t gpio_num = (uint32_t)arg;
     /// 将 GPIO 引脚号添加到 gpio_event_queue 队列中。
+    // 在将gpio_num发送到队列时，需要屏蔽中断
     xQueueSendFromISR(gpio_event_queue, &gpio_num, NULL);
+    // 为什么不直接在中断处理函数中读取按键值呢？
 }
 ```
 
@@ -797,7 +815,7 @@ static void process_isr(void *arg)
         if (xQueueReceive(gpio_event_queue, &gpio_num, portMAX_DELAY))
         {
             /// 如果产生中断的GPIO引脚号是 GPIO_NUM_0，也就是键盘中断引脚。
-            if (gpio_num == 0)
+            if (gpio_num == KEYBOARD_INT)
             {
                 /// 读取按键值。
                 uint8_t key_num = KEYBOARD_read_key();
@@ -805,6 +823,7 @@ static void process_isr(void *arg)
                 printf("press key: %d\r\n", key_num);
             }
         }
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 ```
@@ -820,8 +839,10 @@ static void ISR_QUEUE_Init(void)
     xTaskCreate(process_isr, "process_isr", 2048, NULL, 10, NULL);
     /// 启用中断
     gpio_install_isr_service(0);
-    /// 来自 GPIO_NUM_0 也就是 SC12B_INT 的中断触发的回调函数是 gpio_isr_handler 。
-    gpio_isr_handler_add(SC12B_INT, gpio_isr_handler, (void *)SC12B_INT);
+    /// 来自 GPIO_NUM_0 也就是 KEYBOARD_INT 的中断触发的回调函数是 gpio_isr_handler 。
+    /// 将KEYBOARD_INT的中断处理逻辑代理给gpio_isr_handler
+    /// 当KEYBOARD_INT产生中断，将触发gpio_isr_handler的执行
+    gpio_isr_handler_add(KEYBOARD_INT, gpio_isr_handler, (void *)KEYBOARD_INT);
 }
 ```
 
@@ -929,7 +950,7 @@ RGB共需要24 bits数据表示。
 - G: 8 bits
 - B: 8 bits
 
-​	
+​
 
 原理图如下：
 
@@ -1628,7 +1649,15 @@ void get_chip_sn(void)
     uint8_t *data = (uint8_t *)malloc(BUF_SIZE);
 
     // 获取芯片唯一序列号 0x34。确认码=00H 表示 OK；确认码=01H 表示收包有错。
-    uint8_t PS_GetChipSN[13] = {0xEF, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0x04, 0x34, 0x00, 0x00, 0x39};
+    uint8_t PS_GetChipSN[13] = {
+        0xEF, 0x01, // 包头
+        0xFF, 0xFF, 0xFF, 0xFF, // 默认的设备地址
+        0x01, // 包标识
+        0x00, 0x04, // 包长度
+        0x34, // 指令码
+        0x00, // 参数
+        0x00, 0x39 // 校验和sum
+    };
     uart_write_bytes(UART_NUM_1, (const char *)PS_GetChipSN, 13);
 
     // Read data from the UART
@@ -1835,7 +1864,7 @@ BLE实现了一套与经典蓝牙不同的通信协议，包括低功耗的物�
 > idf.py flash monitor
 > ```
 >
-> 
+>
 
 在本文档中，我们回顾了在ESP32上实现蓝牙低功耗（BLE）通用属性配置文件（GATT）服务器的GATT SERVER示例代码。这个示例围绕两个应用程序配置文件和一系列事件设计，这些事件被处理以执行一系列配置步骤，例如定义广告参数、更新连接参数以及创建服务和特性。此外，这个示例处理读写事件，包括一个写长特性请求，它将传入数据分割成块，以便数据能够适应属性协议（ATT）消息。本文档遵循程序工作流程，并分解代码以便理解每个部分和实现背后的原因。
 
@@ -1966,15 +1995,15 @@ esp_ble_gap_register_callback(gap_event_handler);
 函数 `gatts_event_handler()` 和 `gap_event_handler()` 处理所有从BLE栈协议推送给应用程序的事件。
 
 > 在蓝牙协议栈中，GAP（Generic Access Profile）和GATT（Generic Attribute Profile）是两个非常重要的概念，它们各自承担着不同的职责。
-> 
+>
 > GAP（Generic Access Profile）
-> 
+>
 > GAP是蓝牙技术中的通用接入配置文件，它定义了蓝牙设备如何发现其他蓝牙设备以及如何建立连接和安全性的基本要求。简单来说，GAP负责蓝牙设备的连接模式和过程。它包括设备的广播、探索、连接和配对过程。GAP确保了不同厂商生产的蓝牙设备能够相互识别和连接。
-> 
+>
 > GATT（Generic Attribute Profile）
-> 
+>
 > GATT是基于BLE（Bluetooth Low Energy，蓝牙低能耗）技术的一种协议规范，它定义了通过BLE连接进行数据交换的方式。GATT使用一个基于属性的数据模型，这些属性可以是数据、配置或者其他类型的信息，如设备名称或可测量的数据等。GATT协议规定了如何对这些属性进行格式化和传输，从而使得设备间能够交换具有结构的数据。GATT构建在ATT（Attribute Protocol）之上，主要用于定义设备如何使用一个通用的数据结构来交互。
-> 
+>
 > 简而言之，GAP负责定义和管理设备的连接，而GATT则负责定义设备间如何交换数据。这两者共同工作，使得蓝牙设备不仅能够连接，还能够有效地通信和交换数据。
 
 ### 应用程序配置文件(APPLICATION PROFILES)
@@ -2342,16 +2371,16 @@ case ESP_GATTS_CREATE_EVT:
      ESP_LOGI(GATTS_TAG, "CREATE_SERVICE_EVT, status %d, service_handle %d\n", param->create.status, param->create.service_handle);
      gl_profile_tab[PROFILE_A_APP_ID].service_handle = param->create.service_handle;
      gl_profile_tab[PROFILE_A_APP_ID].char_uuid.len = ESP_UUID_LEN_16;
-     gl_profile_tab[PROFILE_A_APP_ID].char_uuid.uuid.uuid16 = GATTS_CHAR_UUID_TEST_A;  
+     gl_profile_tab[PROFILE_A_APP_ID].char_uuid.uuid.uuid16 = GATTS_CHAR_UUID_TEST_A;
 
      esp_ble_gatts_start_service(gl_profile_tab[PROFILE_A_APP_ID].service_handle);
      a_property = ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE | ESP_GATT_CHAR_PROP_BIT_NOTIFY;
-     esp_err_t add_char_ret =  
-     esp_ble_gatts_add_char(gl_profile_tab[PROFILE_A_APP_ID].service_handle,  
-                            &gl_profile_tab[PROFILE_A_APP_ID].char_uuid,  
-                            ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,  
-                            a_property,  
-                            &gatts_demo_char1_val,  
+     esp_err_t add_char_ret =
+     esp_ble_gatts_add_char(gl_profile_tab[PROFILE_A_APP_ID].service_handle,
+                            &gl_profile_tab[PROFILE_A_APP_ID].char_uuid,
+                            ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+                            a_property,
+                            &gatts_demo_char1_val,
                             NULL);
     if (add_char_ret){
         ESP_LOGE(GATTS_TAG, "add char failed, error code =%x",add_char_ret);
@@ -2424,22 +2453,22 @@ esp_bt_uuid_t char_uuid;           /*!< Characteristic uuid */
          const uint8_t *prf_char;
 
          ESP_LOGI(GATTS_TAG, "ADD_CHAR_EVT, status %d,  attr_handle %d, service_handle %d\n",
-                 param->add_char.status, param->add_char.attr_handle, param->add_char.service_handle);  
+                 param->add_char.status, param->add_char.attr_handle, param->add_char.service_handle);
                  gl_profile_tab[PROFILE_A_APP_ID].char_handle = param->add_char.attr_handle;
-                 gl_profile_tab[PROFILE_A_APP_ID].descr_uuid.len = ESP_UUID_LEN_16;  
-                 gl_profile_tab[PROFILE_A_APP_ID].descr_uuid.uuid.uuid16 = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;  
-                 esp_err_t get_attr_ret = esp_ble_gatts_get_attr_value(param->add_char.attr_handle, &length, &prf_char);         
-         if (get_attr_ret == ESP_FAIL){  
+                 gl_profile_tab[PROFILE_A_APP_ID].descr_uuid.len = ESP_UUID_LEN_16;
+                 gl_profile_tab[PROFILE_A_APP_ID].descr_uuid.uuid.uuid16 = ESP_GATT_UUID_CHAR_CLIENT_CONFIG;
+                 esp_err_t get_attr_ret = esp_ble_gatts_get_attr_value(param->add_char.attr_handle, &length, &prf_char);
+         if (get_attr_ret == ESP_FAIL){
             ESP_LOGE(GATTS_TAG, "ILLEGAL HANDLE");
          }
          ESP_LOGI(GATTS_TAG, "the gatts demo char length = %x\n", length);
          for(int i = 0; i < length; i++){
              ESP_LOGI(GATTS_TAG, "prf_char[%x] = %x\n",i,prf_char[i]);
-         }       
-         esp_err_t add_descr_ret = esp_ble_gatts_add_char_descr(  
-                                 gl_profile_tab[PROFILE_A_APP_ID].service_handle,  
-                                 &gl_profile_tab[PROFILE_A_APP_ID].descr_uuid,  
-                                 ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,  
+         }
+         esp_err_t add_descr_ret = esp_ble_gatts_add_char_descr(
+                                 gl_profile_tab[PROFILE_A_APP_ID].service_handle,
+                                 &gl_profile_tab[PROFILE_A_APP_ID].descr_uuid,
+                                 ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
                                  NULL,NULL);
          if (add_descr_ret){
             ESP_LOGE(GATTS_TAG, "add char descr failed, error code = %x", add_descr_ret);
@@ -2453,7 +2482,7 @@ esp_bt_uuid_t char_uuid;           /*!< Characteristic uuid */
 ```c
     case ESP_GATTS_ADD_CHAR_DESCR_EVT:
          ESP_LOGI(GATTS_TAG, "ADD_DESCR_EVT, status %d, attr_handle %d, service_handle %d\n",
-                  param->add_char.status, param->add_char.attr_handle,  
+                  param->add_char.status, param->add_char.attr_handle,
                   param->add_char.service_handle);
          break;
 ```
@@ -2467,22 +2496,22 @@ esp_bt_uuid_t char_uuid;           /*!< Characteristic uuid */
 Profile A 连接事件：
 
 ```c
-case ESP_GATTS_CONNECT_EVT: {  
-     esp_ble_conn_update_params_t conn_params = {0};  
+case ESP_GATTS_CONNECT_EVT: {
+     esp_ble_conn_update_params_t conn_params = {0};
      memcpy(conn_params.bda, param->connect.remote_bda, sizeof(esp_bd_addr_t));
      /* For the IOS system, please reference the apple official documents about the ble connection parameters restrictions. */
-     conn_params.latency = 0;  
-     conn_params.max_int = 0x30;    // max_int = 0x30*1.25ms = 40ms  
-     conn_params.min_int = 0x10;    // min_int = 0x10*1.25ms = 20ms   
-     conn_params.timeout = 400;     // timeout = 400*10ms = 4000ms  
-     ESP_LOGI(GATTS_TAG, "ESP_GATTS_CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:, is_conn %d",  
-             param->connect.conn_id,  
-             param->connect.remote_bda[0],  
-             param->connect.remote_bda[1],  
-             param->connect.remote_bda[2],  
-             param->connect.remote_bda[3],  
-             param->connect.remote_bda[4],  
-             param->connect.remote_bda[5],  
+     conn_params.latency = 0;
+     conn_params.max_int = 0x30;    // max_int = 0x30*1.25ms = 40ms
+     conn_params.min_int = 0x10;    // min_int = 0x10*1.25ms = 20ms
+     conn_params.timeout = 400;     // timeout = 400*10ms = 4000ms
+     ESP_LOGI(GATTS_TAG, "ESP_GATTS_CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:, is_conn %d",
+             param->connect.conn_id,
+             param->connect.remote_bda[0],
+             param->connect.remote_bda[1],
+             param->connect.remote_bda[2],
+             param->connect.remote_bda[3],
+             param->connect.remote_bda[4],
+             param->connect.remote_bda[5],
              param->connect.is_connected);
      gl_profile_tab[PROFILE_A_APP_ID].conn_id = param->connect.conn_id;
      //start sent the update connection parameters to the peer device.
@@ -2494,15 +2523,15 @@ case ESP_GATTS_CONNECT_EVT: {
 Profile B连接事件：
 
 ```c
-case ESP_GATTS_CONNECT_EVT:  
-     ESP_LOGI(GATTS_TAG, "CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:, is_conn %d\n",  
-              param->connect.conn_id,  
-              param->connect.remote_bda[0],  
-              param->connect.remote_bda[1],  
-              param->connect.remote_bda[2],  
-              param->connect.remote_bda[3],  
-              param->connect.remote_bda[4],  
-              param->connect.remote_bda[5],  
+case ESP_GATTS_CONNECT_EVT:
+     ESP_LOGI(GATTS_TAG, "CONNECT_EVT, conn_id %d, remote %02x:%02x:%02x:%02x:%02x:%02x:, is_conn %d\n",
+              param->connect.conn_id,
+              param->connect.remote_bda[0],
+              param->connect.remote_bda[1],
+              param->connect.remote_bda[2],
+              param->connect.remote_bda[3],
+              param->connect.remote_bda[4],
+              param->connect.remote_bda[5],
               param->connect.is_connected);
       gl_profile_tab[PROFILE_B_APP_ID].conn_id = param->connect.conn_id;
       break;
@@ -2549,19 +2578,19 @@ bool need_rsp;             /*!< The read operation need to do response */
 
 ```c
 case ESP_GATTS_READ_EVT: {
-     ESP_LOGI(GATTS_TAG, "GATT_READ_EVT, conn_id %d, trans_id %d, handle %d\n",  
-              param->read.conn_id, param->read.trans_id, param->read.handle);  
-              esp_gatt_rsp_t rsp;  
-              memset(&rsp, 0, sizeof(esp_gatt_rsp_t));  
-              rsp.attr_value.handle = param->read.handle;  
-              rsp.attr_value.len = 4;  
-              rsp.attr_value.value[0] = 0xde;  
-              rsp.attr_value.value[1] = 0xed;  
-              rsp.attr_value.value[2] = 0xbe;  
-              rsp.attr_value.value[3] = 0xef;  
-              esp_ble_gatts_send_response(gatts_if,  
-                                          param->read.conn_id,  
-                                          param->read.trans_id,  
+     ESP_LOGI(GATTS_TAG, "GATT_READ_EVT, conn_id %d, trans_id %d, handle %d\n",
+              param->read.conn_id, param->read.trans_id, param->read.handle);
+              esp_gatt_rsp_t rsp;
+              memset(&rsp, 0, sizeof(esp_gatt_rsp_t));
+              rsp.attr_value.handle = param->read.handle;
+              rsp.attr_value.len = 4;
+              rsp.attr_value.value[0] = 0xde;
+              rsp.attr_value.value[1] = 0xed;
+              rsp.attr_value.value[2] = 0xbe;
+              rsp.attr_value.value[3] = 0xef;
+              esp_ble_gatts_send_response(gatts_if,
+                                          param->read.conn_id,
+                                          param->read.trans_id,
                                           ESP_GATT_OK, &rsp);
      break;
     }
@@ -2588,7 +2617,7 @@ uint8_t *value;           /*!< The write attribute value */
 当写入事件被触发时，此示例会打印日志消息，然后执行`example_write_event_env()`函数。
 
 ```c
-case ESP_GATTS_WRITE_EVT: {                          
+case ESP_GATTS_WRITE_EVT: {
      ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, conn_id %d, trans_id %d, handle %d\n", param->write.conn_id, param->write.trans_id, param->write.handle);
      if (!param->write.is_prep){
         ESP_LOGI(GATTS_TAG, "GATT_WRITE_EVT, value len %d, value :", param->write.len);
@@ -2601,12 +2630,12 @@ case ESP_GATTS_WRITE_EVT: {
                     uint8_t notify_data[15];
                     for (int i = 0; i < sizeof(notify_data); ++i)
                     {
-                         notify_data[i] = i%0xff;  
+                         notify_data[i] = i%0xff;
                      }
                      //the size of notify_data[] need less than MTU size
-                     esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id,  
-                                                 gl_profile_tab[PROFILE_B_APP_ID].char_handle,  
-                                                 sizeof(notify_data),  
+                     esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id,
+                                                 gl_profile_tab[PROFILE_B_APP_ID].char_handle,
+                                                 sizeof(notify_data),
                                                  notify_data, false);
                 }
             }else if (descr_value == 0x0002){
@@ -2618,9 +2647,9 @@ case ESP_GATTS_WRITE_EVT: {
                          indicate_data[i] = i % 0xff;
                       }
                       //the size of indicate_data[] need less than MTU size
-                     esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id,  
-                                                 gl_profile_tab[PROFILE_B_APP_ID].char_handle,  
-                                                 sizeof(indicate_data),  
+                     esp_ble_gatts_send_indicate(gatts_if, param->write.conn_id,
+                                                 gl_profile_tab[PROFILE_B_APP_ID].char_handle,
+                                                 sizeof(indicate_data),
                                                  indicate_data, true);
                 }
              }
@@ -2667,7 +2696,7 @@ void example_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t *prepare
             gatt_rsp->attr_value.offset = param->write.offset;
             gatt_rsp->attr_value.auth_req = ESP_GATT_AUTH_REQ_NONE;
             memcpy(gatt_rsp->attr_value.value, param->write.value, param->write.len);
-            esp_err_t response_err = esp_ble_gatts_send_response(gatts_if, param->write.conn_id,  
+            esp_err_t response_err = esp_ble_gatts_send_response(gatts_if, param->write.conn_id,
                                                                  param->write.trans_id, status, gatt_rsp);
             if (response_err != ESP_OK){
                ESP_LOGE(GATTS_TAG, "Send response error\n");
@@ -2691,7 +2720,7 @@ void example_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t *prepare
 当客户端发送写请求或准备写请求时，服务器应当响应。然而，如果客户端发送一个无需响应的写命令，服务器不需要回复响应。通过检查`write.need_rsp`参数的值来在写入过程中进行检查。如果需要响应，则继续执行响应准备；如果不存在，则客户端不需要响应，因此过程结束。
 
 ```c
-void example_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t *prepare_write_env,  
+void example_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t *prepare_write_env,
                              esp_ble_gatts_cb_param_t *param){
     esp_gatt_status_t status = ESP_GATT_OK;
     if (param->write.need_rsp){
@@ -2726,10 +2755,10 @@ static prepare_type_env_t b_prepare_write_env;
 
 ```c
 if (prepare_write_env->prepare_buf == NULL) {
-    prepare_write_env->prepare_buf =  
-    (uint8_t*)malloc(PREPARE_BUF_MAX_SIZE*sizeof(uint8_t));  
+    prepare_write_env->prepare_buf =
+    (uint8_t*)malloc(PREPARE_BUF_MAX_SIZE*sizeof(uint8_t));
     prepare_write_env->prepare_len = 0;
-    if (prepare_write_env->prepare_buf == NULL) {  
+    if (prepare_write_env->prepare_buf == NULL) {
        ESP_LOGE(GATTS_TAG, "Gatt_server prep no mem\n");
        status = ESP_GATT_NO_RESOURCES;
     }
@@ -2758,7 +2787,7 @@ gatt_rsp->attr_value.handle = param->write.handle;
 gatt_rsp->attr_value.offset = param->write.offset;
 gatt_rsp->attr_value.auth_req = ESP_GATT_AUTH_REQ_NONE;
 memcpy(gatt_rsp->attr_value.value, param->write.value, param->write.len);
-esp_err_t response_err = esp_ble_gatts_send_response(gatts_if, param->write.conn_id,  
+esp_err_t response_err = esp_ble_gatts_send_response(gatts_if, param->write.conn_id,
                                                      param->write.trans_id, status, gatt_rsp);
 if (response_err != ESP_OK){
     ESP_LOGE(GATTS_TAG, "Send response error\n");
@@ -2773,7 +2802,7 @@ if (status != ESP_GATT_OK){
 
 ```c
 memcpy(prepare_write_env->prepare_buf + param->write.offset,
-       param->write.value,  
+       param->write.value,
        param->write.len);
 prepare_write_env->prepare_len += param->write.len;
 ```
@@ -2781,10 +2810,10 @@ prepare_write_env->prepare_len += param->write.len;
 客户端通过发送执行写请求来完成长写序列。这个命令触发一个`ESP_GATTS_EXEC_WRITE_EVT`事件。服务器通过发送响应并执行`example_exec_write_event_env()`函数来处理这个事件：
 
 ```c
-case ESP_GATTS_EXEC_WRITE_EVT:  
-     ESP_LOGI(GATTS_TAG,"ESP_GATTS_EXEC_WRITE_EVT");  
-     esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);  
-     example_exec_write_event_env(&a_prepare_write_env, param);  
+case ESP_GATTS_EXEC_WRITE_EVT:
+     ESP_LOGI(GATTS_TAG,"ESP_GATTS_EXEC_WRITE_EVT");
+     esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
+     example_exec_write_event_env(&a_prepare_write_env, param);
      break;
 ```
 
@@ -2809,9 +2838,9 @@ void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble
 执行写操作用于通过长特征写入程序来确认或取消之前完成的写入过程。为了做到这一点，函数检查与事件一起接收的参数中的`exec_write_flag`。如果标志等于由`exec_write_flag`表示的执行标志，则写入被确认，并且缓冲区的内容将被打印在日志中；如果不是，则意味着写入被取消，所有已写入的数据将被删除。
 
 ```c
-if (param->exec_write.exec_write_flag == ESP_GATT_PREP_WRITE_EXEC) {  
-   esp_log_buffer_hex(GATTS_TAG,  
-                      prepare_write_env->prepare_buf,  
+if (param->exec_write.exec_write_flag == ESP_GATT_PREP_WRITE_EXEC) {
+   esp_log_buffer_hex(GATTS_TAG,
+                      prepare_write_env->prepare_buf,
                       prepare_write_env->prepare_len);
 } else {
     ESP_LOGI(GATTS_TAG,"ESP_GATT_PREP_WRITE_CANCEL");
